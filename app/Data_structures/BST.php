@@ -375,7 +375,7 @@ class BST
             }
             else 
             {
-                $parent->right = $node;
+                $parent->right = $child;
             }
         }
         return true;

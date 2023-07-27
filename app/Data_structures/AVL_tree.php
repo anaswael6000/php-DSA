@@ -15,18 +15,11 @@ class AVL_tree extends BST
   public function right_rotate($variable)
   {
     // Check whether the provided variable is a node's value or the node itself
-    $node = ($variable instanceof AVL_treeNode) ? $variable : $this->get_node($variable);
+    $node = ($variable instanceof TreeNode) ? $variable : $this->get_node($variable);
 
     // Get the parent node of the node that will be rotated to set its new pointers after the rotation
     $parent = $this->get_parent($node);
-
-    /*
-       Get the relationship between the parent and the child to maintain this relation between the parent and 
-       the new child ( new root ) after the rotation 
-    */
     
-    $relationship = (isset($parent->left)) ? "left" : "right";
-   
     // Rotate
     $newRoot = $node->left;
     $node->left = $newRoot->right;
@@ -40,17 +33,9 @@ class AVL_tree extends BST
     else
     {
       // If the node is not the root then set the parent of the node that was rotated to the new child 
-      if ($relationship === "left")
-      {
-        $parent->left = $newRoot;
-      }
-      else
-      {
-        $parent->right = $newRoot;
-      }
-
+      $parent->left = ($parent->left === $node) ? $newRoot : $parent->left;
+      $parent->right = ($parent->right === $node) ? $newRoot : $parent->right;
     }
-
   }
   
   public function left_right_rotate($variable)
@@ -64,11 +49,10 @@ class AVL_tree extends BST
   public function left_rotate($variable)
   {
     // Check whether the provided variable was the  node's value or the node itself
-    $node = ($variable instanceof AVL_treeNode) ? $variable : $this->get_node($variable);
+    $node = ($variable instanceof TreeNode) ? $variable : $this->get_node($variable);
 
     // Get the parent node of the node that will be rotated to set its new pointers after the rotation
     $parent = $this->get_parent($node);
-    $relationship = (isset($parent->left)) ? "left" : "right";
 
     // Rotate
     $newRoot = $node->right;
@@ -83,7 +67,7 @@ class AVL_tree extends BST
     else
     {
       // If the node is not the root then set the parent of the node that was rotated to the new child 
-      if ($relationship === "left")
+      if ($parent->left === $node)
       {
         $parent->left = $newRoot;
       }
@@ -118,7 +102,7 @@ class AVL_tree extends BST
       }
   }
 
-  public function removeValue($value)
+  public function remove($value)
   {
       try
       {
@@ -143,7 +127,7 @@ class AVL_tree extends BST
           }
 
           $value = $successor->value;
-          $this->removeValue($successor->value);
+          $this->remove($successor->value);
           $node->value = $value;
       }
 

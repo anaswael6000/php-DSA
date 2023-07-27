@@ -102,7 +102,7 @@ final class AVL_treeTest extends TestCase
   public function test_self_balancing_when_deletion($input, $value, $expected_output)
   {
     $this->AVL_tree->insertValues($input);
-    $this->AVL_tree->removeValue($value);
+    $this->AVL_tree->remove($value);
     $this->expectOutputString($expected_output);
     $this->AVL_tree->breadth_first_traversal($this->AVL_tree->root);
   }

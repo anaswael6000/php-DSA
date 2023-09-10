@@ -2,6 +2,8 @@
 
 namespace app\Data_structures;
 
+include "app/Data_structures/linkedList.php";
+
 class queue
 {
     private $front = NULL;
@@ -70,4 +72,83 @@ class queue
         $this->size = 0;
     }
 
+}
+
+class priority_queue
+{
+    public $data = [];
+
+    public function enqueueMultipleValues(array $values)
+    {
+        foreach($values as [$priority, $value])
+        {
+            $this->enqueue([$priority, $value]);
+        }
+    }
+    
+    public function enqueue($array)
+    {
+        $this->data[] = ['priority' => $array[0], 'value' => $array[1]]; 
+        $this->bubbleUp(count($this->data) - 1);
+    }
+
+    public function bubbleUp($index)
+    {
+        $parent_index = intdiv($index - 1, 2);
+
+        while($this->data[$index]['priority'] < $this->data[$parent_index]['priority'])
+        {
+            $this->swap($index, $parent_index);
+            $index = $parent_index;
+            $parent_index = intdiv($index - 1, 2);
+        }
+    }
+    
+    public function dequeue()
+    {
+        $dequeued_element = $this->data[0];
+        $this->data[0] = $this->data[count($this->data) - 1];
+        array_pop($this->data);
+        $this->sinkDown(0);
+        return $dequeued_element;
+    }
+    public function sinkDown($index)
+    {
+        $size = count($this->data);
+        $left_child = 2 * $index + 1;
+        $right_child = 2 * $index + 2;
+        $smallest = $index;
+
+        // Figure out the smallest element of the parent and his children
+        $smallest = ($left_child < $size && $this->data[$left_child]['priority'] < $this->data[$smallest]['priority']) ? $left_child : $smallest;
+        $smallest = ($right_child < $size && $this->data[$right_child]['priority'] < $this->data[$smallest]['priority']) ? $right_child : $smallest;
+        
+        // The parent is the smallest element then we are all good move on to the next parent
+        if ($smallest === $index) return;
+
+        // if the parent is not the smallest element then swap the parent with the smallest element
+        $this->swap($smallest, $index);
+        $this->sinkDown($smallest);
+    }
+
+    public function swap($index, $parent_index)
+    {
+        $temp = $this->data[$index];
+        $this->data[$index] = $this->data[$parent_index];
+        $this->data[$parent_index] = $temp;
+    }
+ 
+    public function updatePriority($index, $newPriority)
+    {
+        if ($newPriority > $this->data[$index]['priority'])       
+        {
+            $this->data[$index]['priority'] = $newPriority;
+            $this->sinkDown($index);
+        }
+        else
+        {
+            $this->data[$index]['priority'] = $newPriority;
+            $this->bubbleUp($index);
+        }
+    }
 }

@@ -99,41 +99,33 @@ class RedBlackTree extends AVL_tree
     
     public function FixViolations($node)
     {
-        while ($node->parent !== null && $node->parent->color === "red")
+        while (isset($node->parent) && $node->parent->color === "red")
         {
             $parent = $node->parent;
-            $grandparent = $node->parent->parent;
+            $grandparent = $parent->parent;
             $uncle = ($grandparent->left === $parent) ? $grandparent->right : $grandparent->left;
-            
-            if ($uncle !== null && $uncle->color !== "black")
+            if ($uncle !== null && $uncle->color === "red")
             {
-                // Then node uncle is red
                 $this->recolor($parent);
                 $this->recolor($grandparent);
                 $this->recolor($uncle);
                 $node = $grandparent;
                 continue;
             }
-            // Else then the node uncle is black
-            
-            // Check if a triangle is formed
+            // uncle is black, First check if a triangle is formed
             if (($grandparent->left === $parent && $parent->right === $node) || ($grandparent->right === $parent && $parent->left === $node))
             {
-                // This method only rotates the first parameter.The second parameter is only to determine the direction of the rotation
+                // This method only rotates the first parameter the second one is only for rotation type determination
                 $this->rotate($parent, $node);
-                
-                // Update variable names 
-                $tmp = $parent;
+                $this->updateParentPropertyOf($node, $parent);
+                // Update variable names
+                $temp = $parent;
                 $parent = $node;
-                $node = $tmp;
+                $node = $temp;
             }
-            /* The following code will execute whether a triangle was formed or not because if a triangle was formed then
-                the rotation will naturally form a line.
-                If a triangle was not formed then a line must be formed because the node uncle is black */
-
-            $this->recolor($grandparent);
+            // A line is formed
             $this->recolor($parent);
-            // This method only rotates the first parameter.The second parameter is only to determine the direction of the rotation
+            $this->recolor($grandparent);
             $this->rotate($grandparent, $parent);
         }
         $this->root->color = "black";

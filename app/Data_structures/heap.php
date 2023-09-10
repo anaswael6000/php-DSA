@@ -81,9 +81,9 @@ class MinHeap
 
     public function heapPush($value)
     {
-       $this->data[] = $value;
+        $this->data[] = $value;
 
-      $this->heapify();
+        $this->heapify();
     }
 
     public function get_peek()
@@ -111,8 +111,7 @@ class MinHeap
         $sorted_array = [];
         while (count($this->data) !== 0)
         {
-            $sorted_array[] = $this->data[0];
-            array_shift($this->data);
+            $sorted_array[] = array_shift($this->data);
             $this->heapify();
         }
         return $sorted_array;

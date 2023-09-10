@@ -5,13 +5,11 @@ namespace app\Data_structures;
 class Node
 {
     public $data;
-    public $next;
-    public $previous;
+    public $next = null;
 
     public function __construct($data)
     {
         $this->data = $data;
-        $this->next = NULl;
     }
 }
 
@@ -254,19 +252,19 @@ class linkedList
         return $length;
     }
 
-   public function reverse()
-   {
-        $current = $this->head;
-        $previous = NULL;
-        while($current)
-        {
-            $next = $current->next;
-            $current->next = $previous;
-            $previous = $current;
-            $current = $next;
-        }
-        $this->head = $previous;
-   }
+    public function reverse()
+    {
+            $current = $this->head;
+            $previous = NULL;
+            while($current)
+            {
+                $next = $current->next;
+                $current->next = $previous;
+                $previous = $current;
+                $current = $next;
+            }
+            $this->head = $previous;
+    }
 
     public function print()
     {

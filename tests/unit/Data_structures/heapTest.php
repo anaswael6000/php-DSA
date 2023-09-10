@@ -53,6 +53,7 @@ final class heapTest extends TestCase
         $this->assertEquals($expected_MaxHeap ,$this->MaxHeap->heapSort());
         $this->assertEquals($expected_MinHeap ,$this->MinHeap->heapSort());
     }
+
 }
 
 class heapTestDataProviders

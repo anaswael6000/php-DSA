@@ -109,7 +109,7 @@ final class graphTest extends TestCase
     {
         $this->adjacencyList->addVertices($vertices);
         $this->adjacencyList->removeVertex($vertex);
-        $this->assertTrue(!isset($this->adjacencyList->data[$vertex]) && $this->adjacencyList->data);
+        $this->assertTrue(!isset($this->adjacencyList->data[$vertex]));
         $this->assertEquals(count($vertices) - 1, count($this->adjacencyList->data));
     }
 
@@ -177,11 +177,11 @@ final class graphTest extends TestCase
     {
         $this->adjacencyList->addVertices($vertices);
         $this->adjacencyList->setEdges($edges, true);
-        $this->adjacencyList->transpose($edges);
-        foreach($edges as $edge)
+        $reversed_adjacencyList = $this->adjacencyList->transpose();
+        foreach($this->adjacencyList->edges as [$source, $destination])
         {
-            $this->assertTrue(in_array($edge[0], $this->adjacencyList->data[$edge[1]]));
-            $this->assertFalse(in_array($edge[1], $this->adjacencyList->data[$edge[0]]));
+            $this->assertTrue(in_array($source, $reversed_adjacencyList[$destination]));
+            $this->assertFalse(in_array($destination, $reversed_adjacencyList[$source]));
         }
     }
 
@@ -199,8 +199,7 @@ final class graphTest extends TestCase
     {
         $this->adjacencyList->addVertices($vertices);
         $this->adjacencyList->setEdges($edges);
-        $this->expectOutputString($expected_output);
-        $this->adjacencyList->DFS($vertex);
+        $this->assertEquals($expected_output, $this->adjacencyList->DFS($vertex));
     }
 
     #[DataProviderExternal('graphTestDataProviders', 'test_detecting_a_cycle_in_a_graph_data_provider')]
@@ -252,6 +251,62 @@ final class graphTest extends TestCase
         $actual_MST = $this->adjacencyList->prim();
         ksort($actual_MST);
         $this->assertEquals($expected_MST, $actual_MST);
+    }
+
+    #[DataProviderExternal('graphTestDataProviders', 'test_topological_sorting_data_provider')]
+    public function test_topological_sorting($vertices, $edges, $expected_output_using_DFS, $expected_output_from_kahn)
+    {
+        $this->adjacencyList->addVertices($vertices);
+        $this->adjacencyList->setEdges($edges, true);
+        $this->assertEquals($expected_output_using_DFS, $this->adjacencyList->topological_sort());
+        $this->assertEquals($expected_output_from_kahn, $this->adjacencyList->kahn());
+    }
+
+    public function test_finding_articulation_points()
+    {
+        $this->adjacencyList->addVertices([1, 2, 3, 4, 5]);
+        $this->adjacencyList->setEdges([[1, 2], [1, 3], [2, 3], [3, 4], [4, 5]]);
+        $this->assertEquals([3, 4], $this->adjacencyList->find_articulation_points());
+    }
+    
+    public function test_finding_bridges()
+    {
+        $this->adjacencyList->addVertices([0, 1, 2, 3]);
+        $this->adjacencyList->setEdges([[0, 1], [1, 2], [2, 3]]);
+        $this->assertEquals([[0, 1], [1, 2], [2, 3]], $this->adjacencyList->find_bridges());
+        $this->adjacencyList->clearEdges();
+        $this->adjacencyList->addVertex(4);
+        $this->adjacencyList->setEdges([[0, 1], [0, 2], [0, 3], [3, 4], [1, 2]]);
+        $this->assertEquals([[0, 3], [3, 4]], $this->adjacencyList->find_bridges());
+    }
+
+    public function test_finding_connected_components()
+    {
+        $this->adjacencyList->addVertices([0, 1, 2, 3, 4]);
+        $this->adjacencyList->setEdges([[0, 1], [1, 2], [3, 4]]);
+        $this->assertEquals([[0, 1, 2], [3, 4]], $this->adjacencyList->find_connected_components());
+    }
+
+    #[DataProviderExternal('graphTestDataProviders', 'test_finding_SCCs_data_provider')]
+    public function test_finding_SCCs($vertices, $edges, $expected_output_from_kosaraju, $expected_output_from_tarjan)
+    {
+        $this->adjacencyList->addVertices($vertices);
+        $this->adjacencyList->setEdges($edges, true);
+        $this->assertEquals($expected_output_from_kosaraju, $this->adjacencyList->find_SCCs_kosaraju());
+        $this->assertEquals($expected_output_from_tarjan, $this->adjacencyList->find_SCCs_tarjan());
+    }
+
+    public function test_checking_whether_the_graph_is_bi_connected_or_not()
+    {
+        $this->adjacencyList->addVertices([1, 2, 3]);
+        $this->adjacencyList->setEdges([[1, 3], [2, 3]]);
+        $this->assertFalse($this->adjacencyList->bi_connected());
+        $this->adjacencyList->setEdges([[2, 1]]);
+        $this->assertTrue($this->adjacencyList->bi_connected());
+        $this->adjacencyList->data = $this->adjacencyList->vertices = $this->adjacencyList->edges = [];
+        $this->adjacencyList->addVertices([1, 2]);
+        $this->adjacencyList->setEdges([[1, 2]]);
+        $this->assertTrue($this->adjacencyList->bi_connected());
     }
 }
 
@@ -326,11 +381,11 @@ class graphTestDataProviders
         return [
             // Order of input  1:Graph input  2:Edges  3:Vertex  4:Expected Breadth first search output
             [["anas", "sarah", "omar", "roger"], [["anas", "omar"], ["sarah", "omar"], ["anas", "roger"], ["omar", "roger"]], "roger", 
-            "roger omar sarah anas "],
+            ["roger", "omar", "sarah", "anas"]],
     
-            [[1, 2, 3, 4], [[1, 4], [2, 3], [3, 4], [1, 3], [4, 2]], 3, "3 1 4 2 "],
+            [[1, 2, 3, 4], [[1, 4], [2, 3], [3, 4], [1, 3], [4, 2]], 3, [3, 1, 4, 2]],
 
-            [[1, 2, 3, 4], [[1, 4], [2, 3], [3, 4], [1, 3], [4, 2]], 2, "2 4 1 3 "],
+            [[1, 2, 3, 4], [[1, 4], [2, 3], [3, 4], [1, 3], [4, 2]], 2, [2, 4, 1, 3]],
         ];
     }
 
@@ -370,7 +425,6 @@ class graphTestDataProviders
              
             [["A", "B", "C", "D", "E"], [["A", "B", 4], ["A", "C", 2], ["B", "C", 3], ["B", "D", 2], ["B", "E", 3],
              ["C", "D", 4], ["C", "B", 1], ["C", "E", 5], ["E", "D", 1]], true, "A", ["A" => 0, "C" => 2, "B" => 3, "D" => 5, "E" => 6]],
-
             ];
     }
 
@@ -424,6 +478,27 @@ class graphTestDataProviders
             [["A", "B", 1], ["A", "C", 7], ["A", "D", 10], ["A", "E", 5], ["B", "C", 3], ["C", "D", 4], ["D", "E", 2]], 
             ["A" => [[1, "B"]], "B" => [[1, "A"], [3, "C"]], "C" => [[3, "B"], [4, "D"]], "D" => [[4, "C"], [2, "E"]], "E" => [[2, "D"]]]
             ],
+        ];
+    }
+
+    public static function test_topological_sorting_data_provider()
+    {
+        return [
+            // Input:  1:Graph input   2:Edges   3:Expected Output from dfs-based implementation   4:Expected Output from kahn
+            // Note that any graph can have more than one topological sorting
+            [[0, 1, 2, 3, 4, 5], [[5, 0], [5, 2], [4, 0], [4, 1], [2, 3], [3, 1]], [5, 4, 2, 3, 1, 0], [4, 5, 0, 2, 3, 1]],
+        ];
+    }
+
+    public static function test_finding_SCCs_data_provider()
+    {
+        return [
+            // Order of input:  1:Vertices   2:Edges   3:Expected output from kosaraju   4:Expected output from tarjan  
+            // Note that like the topological sorting data provider the only difference between the third and the fourth input is the order 
+            [[1, 2, 3, 4, 5, 6, 7], [[1, 2], [2, 3], [3, 4], [3, 6], [4, 1], [4, 5], [5, 6], [6, 7], [7, 5]],
+             [[1, 4, 3, 2], [5, 7, 6]], [[7, 6, 5], [4, 3, 2, 1]]],
+            [["a", "b", "c", "d", "e"], [["a", "c"], ["c", "b"], ["b", "a"], ["c", "d"], ["d", "e"]], 
+             [["a", "b", "c"], ["d"], ["e"]], [["e"], ["d"], ["b", "c", "a"]]]
         ];
     }
 }

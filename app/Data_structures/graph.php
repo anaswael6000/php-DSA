@@ -151,6 +151,15 @@ class adjacencyList
         }
     }
 
+    public function setFlowEdges($edges)
+    {
+        // Flow edges are directed edges with capacity constraints for the max flow problem
+        foreach($edges as [$source, $destination, $capacity])
+        {
+            $this->data[$source][] = ['v' => $destination, 'capacity' => $capacity, 'flow' => 0];
+        }
+    }
+
     public function edgesExist($edges, $directed = false)
     {
         foreach($edges as [$source, $destination])
@@ -183,25 +192,6 @@ class adjacencyList
 
     // Graph traversal
 
-    public function BFS($vertex)
-    {
-        $queue[] = $vertex;
-        $visited_vertices[$vertex] = true;
-
-        while(!empty($queue))
-        {
-            $vertex = array_shift($queue);
-            echo $vertex . " ";
-
-            foreach($this->data[$vertex] as $neighbor)
-            {
-                if (isset($visited_vertices[$neighbor])) continue;
-                $queue[] = $neighbor;
-                $visited_vertices[$neighbor] = true;
-            }
-        }
-    }
-
     public function DFS($starting_vertex, &$visited_vertices = [])
     {
         $stack = [$starting_vertex];
@@ -219,6 +209,25 @@ class adjacencyList
             }    
         }
         return $result;
+    }
+
+    public function BFS($vertex)
+    {
+        $queue[] = $vertex;
+        $visited_vertices[$vertex] = true;
+
+        while(!empty($queue))
+        {
+            $vertex = array_shift($queue);
+            echo $vertex . " ";
+
+            foreach($this->data[$vertex] as $neighbor)
+            {
+                if (isset($visited_vertices[$neighbor])) continue;
+                $queue[] = $neighbor;
+                $visited_vertices[$neighbor] = true;
+            }
+        }
     }
 
     // Cycle detection
@@ -449,9 +458,107 @@ class adjacencyList
         return $topological_sort;
     }
 
-    // Connectivity
+    // Strongly connected components
 
-    public function find_articulation_points()
+    public function find_SCCs_kosaraju()
+    {
+        $stack = $SCCs = $second_dfs_recursion_stack = [];
+        $visited_vertices = array_fill_keys($this->vertices, false);
+        
+        // Perform depth-first search to create a stack storing vertices with high probability to from SCCs at the top of it
+        foreach($this->vertices as $vertex)
+        {
+            if ($visited_vertices[$vertex]) continue;
+            $this->kosaraju_dfs1($vertex, $stack, $visited_vertices);
+        }
+        
+        // Finding the transpose graph
+        $transpose_graph = $this->transpose();
+
+        // Reset the boolean array for the second traversal
+        $visited_vertices = array_fill_keys($this->vertices, false);
+        
+        while(!empty($stack))
+        {
+            $vertex = array_pop($stack);
+            // This line is crucial to avoid adding empty arrays to the SCCs array after the dfs ends 
+            if ($visited_vertices[$vertex]) continue;
+            $this->kosaraju_dfs2($transpose_graph, $vertex, $second_dfs_recursion_stack, $visited_vertices);
+            $SCCs[] = $second_dfs_recursion_stack;
+            $second_dfs_recursion_stack = [];
+        }
+        return $SCCs;
+    }
+
+    public function kosaraju_dfs1($vertex, &$stack, &$visited_vertices)
+    {
+        if ($visited_vertices[$vertex]) return;
+        $visited_vertices[$vertex] = true;
+        foreach($this->data[$vertex] as $neighbor)
+        {
+            $this->kosaraju_dfs1($neighbor, $stack, $visited_vertices);
+        }
+        $stack[] = $vertex;
+    }
+
+    public function kosaraju_dfs2($transpose_graph, $vertex, &$stack, &$visited_vertices)
+    {
+        if ($visited_vertices[$vertex]) return;
+        $visited_vertices[$vertex] = true;
+        $stack[] = $vertex;
+        foreach($transpose_graph[$vertex] as $neighbor)
+        {
+            $this->kosaraju_dfs2($transpose_graph, $neighbor, $stack, $visited_vertices);
+        }
+    }
+
+    public function find_SCCs_tarjan()
+    {
+        $stack = $disc = $low = $SCCs = [];
+        $present_in_stack = array_fill_keys($this->vertices, false);
+        $timer = 0;
+        foreach($this->vertices as $vertex)
+        {
+            if (isset($disc[$vertex])) continue;
+            $this->tarjan_dfs($vertex, $stack, $present_in_stack, $timer, $disc, $low, $SCCs);
+        }
+        return $SCCs;
+    }
+
+    public function tarjan_dfs($vertex, &$stack, &$present_in_stack, &$timer, &$disc, &$low, &$SCCs)
+    {
+        $disc[$vertex] = $low[$vertex] = $timer;
+        $timer++;
+        $stack[] = $vertex;
+        $present_in_stack[$vertex] = true;
+
+        foreach($this->data[$vertex] as $destination)
+        {
+            if (!isset($disc[$destination]))
+            {
+                $this->tarjan_dfs($destination, $stack, $present_in_stack, $timer, $disc, $low, $SCCs);
+                $low[$vertex] = min($low[$vertex], $low[$destination]);
+            }
+            // If the edge is a cross edge then ignore it
+            elseif ($present_in_stack[$vertex] == false) continue;
+            // Else then it is a back edge
+            $low[$vertex] = min($low[$vertex], $disc[$destination]);
+        }
+        if ($disc[$vertex] !== $low[$vertex]) return;
+        $SCC = [];
+        while(true)
+        {
+            $popped_vertex = array_pop($stack);
+            $present_in_stack[$popped_vertex] = false;
+            $SCC[] = $popped_vertex;
+            if ($vertex == $popped_vertex) break;
+        }
+        $SCCs[] = $SCC;
+    }
+
+    // Other connectivity methods
+
+    public function find_articulation_points_using_naive_approach()
     {
         $number_of_vertices = count($this->vertices);
         $articulation_points = [];
@@ -485,7 +592,48 @@ class adjacencyList
         return $articulation_points;
     }
 
-    public function find_bridges()
+    public function find_articulation_points_using_tarjan_algorithm()
+    {
+        /* In the dfs tree a node is an articulation point if one of the following two conditions is true
+           1: the node is the root and it has at least two children 
+           2: the node is not the root and it has a child v so that the subtree rooted with v does not have any back edges to one of u's ancestors
+        */
+        $disc = $low = $articulation_points = [];
+        $parent = array_fill_keys($this->vertices, null);
+        $timer = 0;
+        foreach($this->vertices as $vertex)
+        {
+            $this->find_articulation_points_using_tarjan_algorithm_dfs($vertex, $parent, $timer, $disc, $low, $articulation_points);
+        }
+        return $articulation_points;
+    }   
+
+    public function find_articulation_points_using_tarjan_algorithm_dfs($vertex, &$parent, &$timer, &$disc, &$low, &$articulation_points)
+    {
+        $disc[$vertex] = $low[$vertex] = $timer;
+        $timer++;
+        $children = 0;
+        foreach($this->data[$vertex] as $destination)
+        {
+            if (!isset($disc[$destination]))
+            {
+                $parent[$destination] = $vertex;
+                $children++;
+                $this->find_articulation_points_using_tarjan_algorithm_dfs($destination, $parent, $timer, $disc, $low, $articulation_points);
+
+                $low[$vertex] = min($low[$vertex], $low[$destination]);
+
+                if (($parent[$vertex] == null && $children > 1) || ($parent[$vertex] !== null && $children > 0 && $low[$destination] >= $disc[$vertex]))
+                {
+                    $articulation_points[] = $vertex;
+                }
+            }
+            elseif($parent[$vertex] === $destination) continue;
+            $low[$vertex] = min($low[$vertex], $disc[$destination]);
+        }
+    }
+
+    public function find_bridges_using_naive_approach()
     {
         $number_of_vertices = count($this->vertices);
         $bridges = [];
@@ -513,6 +661,42 @@ class adjacencyList
         return $bridges;
     }
 
+    public function find_bridges_using_tarjan_algorithm()
+    {
+        $timer = 0;
+        $disc = $low = $bridges = [];
+        $parent = array_fill_keys($this->vertices, false);
+        foreach($this->vertices as $vertex)
+        {
+            if (isset($disc[$vertex])) continue;
+            $this->find_bridges_using_tarjan_algorithm_dfs($vertex, $parent, $timer, $disc, $low, $bridges);
+        }
+        return $bridges;
+    }
+
+    public function find_bridges_using_tarjan_algorithm_dfs($vertex, &$parent, &$timer, &$disc, &$low, &$bridges)
+    {
+        $disc[$vertex] = $low[$vertex] = $timer;
+        $timer++;
+        foreach($this->data[$vertex] as $destination)
+        {
+            if (!isset($disc[$destination]))
+            {
+                $parent[$destination] = $vertex;
+                $this->find_bridges_using_tarjan_algorithm_dfs($destination, $parent, $timer, $disc, $low, $bridges);
+                
+                $low[$vertex] = min($low[$vertex], $low[$destination]);
+
+                if ($low[$destination] > $disc[$vertex])
+                {
+                    $bridges[] = [$vertex, $destination];
+                }
+            }
+            elseif($parent[$vertex] === $destination) continue;
+            $low[$vertex] = min($low[$vertex], $disc[$destination]);
+        }
+    }
+    
     public function find_connected_components()
     {
         $visited_vertices = $connected_components = [];
@@ -524,93 +708,249 @@ class adjacencyList
         return $connected_components;
     }
 
-    public function find_SCCs_kosaraju()
-    {
-        // Initialize variables
-        $stack = $SCCs = $Second_dfs_recursion_stack = $visited_vertices = [];
-
-        // First dfs to create a stack that stores the vertices with high probability to form SCCs at the top 
-        foreach($this->vertices as $vertex)
-        {
-            kosaraju_dfs1($this->data, $vertex, $stack, $visited_vertices);
-        }
-
-        // Getting the transpose of the graph
-        $transpose_graph = $this->transpose();
-
-        // Reset the visited vertices array
-        $visited_vertices = [];
-
-        while (!empty($stack))
-        {
-            $vertex = array_pop($stack);
-            if (isset($visited_vertices[$vertex])) continue;
-            kosaraju_dfs2($transpose_graph, $vertex, $Second_dfs_recursion_stack, $visited_vertices);
-            $SCCs[] = $Second_dfs_recursion_stack;
-            $Second_dfs_recursion_stack = [];
-        }
-
-        return $SCCs;
-    }
-
-    public function find_SCCs_tarjan()
-    {
-        $SCCs = $stack = $disc = $low = [];
-        $present_in_stack = array_fill_keys($this->vertices, false);
-        $timer = 0;
-        foreach($this->vertices as $vertex)
-        {
-            if (isset($disc[$vertex])) continue;
-            $this->tarjan_dfs($vertex, $stack, $present_in_stack, $timer, $disc, $low, $SCCs);
-        }
-        return $SCCs;
-    }
-
-    public function tarjan_dfs($vertex, &$stack, &$present_in_stack, &$timer, &$disc, &$low, &$SCCs)
-    {
-        $disc[$vertex] = $low[$vertex] = $timer;
-        $timer++;
-        $stack[] = $vertex;
-        $present_in_stack[$vertex] = true;
-
-        foreach($this->data[$vertex] as $neighbor)
-        {
-            // If the vertex is not visited
-            if  (!isset($disc[$neighbor]))
-            {
-                $this->tarjan_dfs($neighbor, $stack, $present_in_stack, $timer, $disc, $low, $SCCs);
-                $low[$vertex] = min($low[$vertex], $low[$neighbor]);
-            }
-            else
-            {
-                // If the edge is a cross edge ignore it and move on to the next neighbor
-                if ($present_in_stack[$neighbor] === false) continue;
-                // Else then the edge is a back edge
-                $low[$vertex] = min($low[$vertex], $disc[$neighbor]);
-            }
-        }
-        if ($disc[$vertex] !== $low[$vertex]) return;
-        $SCC = [];
-        // Pop vertices off the stack till we reach the head of the strongly connected component
-        while (true)
-        {
-            $vertex = array_pop($stack);
-            $present_in_stack[$vertex] = false;
-            $SCC[] = $vertex;
-            if ($disc[$vertex] === $low[$vertex]) break;
-        }
-        $SCCs[] = $SCC;
-    }
-
     public function bi_connected()
     {
+        // I'm assuming that the graph is undirected
         // If the graph is disconnected then return false
         if (count($this->DFS($this->vertices[array_rand($this->vertices)])) !== count($this->vertices)) return false;
         // If articulation points are present then return false
-        if (count($this->find_articulation_points()) !== 0) return false;
+        if (count($this->find_articulation_points_using_tarjan_algorithm()) !== 0) return false;
         // Otherwise if the two properties are met return true
         return true;
     }
+
+    public function find_biconnected_components()
+    {
+        $disc = $low = $stack = $biconnected_components = [];
+        $parent = array_fill_keys($this->vertices, null);
+        $timer = 0;
+
+        foreach($this->vertices as $vertex)
+        {
+            if (isset($disc[$vertex])) continue;
+            $this->find_biconnected_components_dfs($vertex, $stack, $parent, $timer, $disc, $low, $biconnected_components);
+            $biconnected_component = [];
+            while($stack)
+            {
+                $edge = array_pop($stack);
+                $biconnected_component[$edge[0]] = true;
+                $biconnected_component[$edge[1]] = true;
+            }
+            if (empty($biconnected_component)) continue;
+            $biconnected_components[] = array_keys($biconnected_component);
+        }
+
+        return $biconnected_components;
+    }
+
+    public function find_biconnected_components_dfs($vertex, &$stack, &$parent, &$timer, &$disc, &$low, &$biconnected_components)
+    {
+        $disc[$vertex] = $low[$vertex] = $timer;
+        $timer++;
+        $children = 0;
+        foreach($this->data[$vertex] as $destination)
+        {
+            if (!isset($disc[$destination]))
+            {
+                $parent[$destination] = $vertex;
+                $children++;
+                $stack[] = [$vertex, $destination];
+                $this->find_biconnected_components_dfs($destination, $stack, $parent, $timer, $disc, $low, $biconnected_components);
+
+                $low[$vertex] = min($low[$vertex], $low[$destination]);
+
+                if (($parent[$vertex] === null && $children > 1) || ($parent[$vertex] !== null && $low[$destination] >= $disc[$vertex]))
+                {
+                    $biconnected_component = [];
+                    while(true)
+                    {
+                        $edge = array_pop($stack);
+                        $biconnected_component[$edge[0]] = true;
+                        $biconnected_component[$edge[1]] = true;
+                        if ($edge[0] === $vertex) break;
+                    }
+                    $biconnected_components[] = array_keys($biconnected_component);
+                }
+            }
+            elseif($parent[$vertex] !== $destination && $low[$vertex] > $disc[$destination])
+            {
+                $stack[] = [$vertex, $destination];
+                $low[$vertex] = min($low[$vertex], $disc[$destination]);
+            }
+        }
+    }
+
+    public function isEulerian(&$vertices_with_non_zero_degrees = [], &$odd_degree_vertices = [])
+    {
+        $vertices_degrees = array_fill_keys($this->vertices, 0);
+        foreach($this->edges as [$source, $destination])
+        {
+            $vertices_degrees[$source]++; 
+            $vertices_degrees[$destination]++; 
+        }
+
+        foreach($this->vertices as $vertex)
+        {
+            if ($vertices_degrees[$vertex] === 0) continue;
+            $vertices_with_non_zero_degrees[] = $vertex;
+        }
+
+        $connected_non_zero_degree_vertices = $this->DFS($vertices_with_non_zero_degrees[0]);
+        foreach($vertices_with_non_zero_degrees as $vertex)
+        {
+            if (in_array($vertex, $connected_non_zero_degree_vertices)) continue;
+            return "Not eulerian";
+        }
+
+        foreach($vertices_with_non_zero_degrees as $vertex)
+        {
+            if ($vertices_degrees[$vertex] % 2 === 0) continue;
+            $odd_degree_vertices[] = $vertex;
+        }
+
+        return (count($odd_degree_vertices) === 0) ? "Eulerian" : ((count($odd_degree_vertices) === 2) ? "Semi-eulerian" : "Not eulerian");
+    }
+
+    public function find_eulerian_path_fleury_algorithm()
+    {
+        $vertices_with_non_zero_degrees = $odd_degree_vertices = [];
+        $graph_type = $this->isEulerian($vertices_with_non_zero_degrees, $odd_degree_vertices);
+
+        // If the graph has no eulerian path(s): exit
+        if ($graph_type === "Not eulerian") return false;
+
+        // If the graph is eulerian start from any vertex if semi-eulerian start from one of the 2 odd vertices
+        $starting_vertex = ($graph_type === "Eulerian") ? $vertices_with_non_zero_degrees[0] : $odd_degree_vertices[0];
+
+        // Identify the graph bridges so that we don't burn bridges
+        $bridges = $this->find_bridges_using_tarjan_algorithm();
+        $bridges_boolean_array = [];
+        foreach($bridges as &$bridge)
+        {
+            $bridges_boolean_array[$bridge[0]][$bridge[1]] = true;
+            $bridges_boolean_array[$bridge[1]][$bridge[0]] = true;
+        }
+        $bridges = $bridges_boolean_array;
+        unset($bridges_boolean_array);
+
+        $visited_edges = [];
+        $result[] = $starting_vertex;
+        $this->fleury_algorithm_traversal($starting_vertex, $visited_edges, $bridges, $result);
+        if (!isset($result[1])) return "No edges in the graph";
+        return $result;
+    }
+
+    public function fleury_algorithm_traversal($vertex, &$visited_edges, &$bridges, &$result)
+    {
+        for($x = 0; $x < count($this->data[$vertex]); $x++)
+        {
+            $destination = $this->data[$vertex][$x];
+            if (isset($visited_edges[$vertex][$destination])) continue;
+            $edge_to_be_traversed = [$vertex, $destination];
+
+            // if the edge is a bridge keep looking for other edges, updating the edge to be traversed if unvisited non-bridges edges were found
+            if (isset($bridges[$vertex][$destination]))
+            {
+                // Start searching for other edges from the next edge
+                for($y = $x + 1; $y < count($this->data[$vertex]); $y++)
+                {
+                    $dest = $this->data[$vertex][$y];
+
+                    // if the edge is also a bridge move on to the next edge
+                    if (isset($bridges[$vertex][$dest])) continue;
+
+                    // if the edge has already been visited move on to the next edge
+                    if (isset($visited_edges[$vertex][$dest])) continue;
+
+                    $edge_to_be_traversed = [$vertex, $dest];
+                }
+            }
+
+            $result[] = $edge_to_be_traversed[1];
+            $visited_edges[$edge_to_be_traversed[0]][$edge_to_be_traversed[1]] = true;
+            $visited_edges[$edge_to_be_traversed[1]][$edge_to_be_traversed[0]] = true;
+            $this->fleury_algorithm_traversal($edge_to_be_traversed[1], $visited_edges, $bridges, $result);
+        }
+    }
+
+    // Maximum flow
+
+    public function ford_fulkerson($source, $sink)
+    {
+        $parent = [];
+        $max_flow = 0;
+        while($this->ford_fulkerson_bfs($source, $sink, $parent))
+        {
+            $bottleneckFlow = INF;
+            $vertex = $sink;
+            while($vertex != $source)
+            {
+                $bottleneckFlow = min($bottleneckFlow, $this->getResidualCapacity($parent[$vertex], $vertex));
+                $vertex = $parent[$vertex];
+            }
+
+            $vertex = $sink;
+            while($vertex !== $source)
+            {
+                $this->updateResidualCapacity($parent[$vertex], $vertex, $bottleneckFlow);
+                $this->updateResidualCapacity($vertex, $parent[$vertex], -$bottleneckFlow);
+                $vertex = $parent[$vertex];
+            }
+
+            $max_flow += $bottleneckFlow;
+            $parent = [];
+        }
+        return $max_flow;
+    }
+
+    public function ford_fulkerson_bfs($source, $sink, &$parent)
+    {
+        $visited_vertices = array_fill_keys($this->vertices, false);
+        $queue = [$source];
+        $visited_vertices[$source] = true;
+
+        while(!empty($queue))
+        {
+            $source = array_shift($queue);
+
+            foreach($this->data[$source] as ['v' => $destination, 'capacity' => $capacity, 'flow' => $flow])
+            {
+                if ($visited_vertices[$destination] === false && $capacity - $flow > 0)
+                {
+                    $parent[$destination] = $source; 
+                    $queue[] = $destination;
+                    $visited_vertices[$destination] = true;
+                }
+            }
+        }
+        // Return true (An augmenting path exists) if we were able to reach the sink vertex
+        return $visited_vertices[$sink];
+    }
+
+    public function getResidualCapacity($source, $destination)
+    {
+        foreach($this->data[$source] as $edge)
+        {
+            if ($edge['v'] !== $destination) continue;
+            return $edge['capacity'] - $edge['flow'];
+        }
+    }
+
+    public function updateResidualCapacity($source, $destination, $bottleneckFlow)
+    {
+        foreach($this->data[$source] as &$edge)
+        {
+            if ($edge['v'] === $destination)
+            {
+                $edge['flow'] += $bottleneckFlow;
+                return;
+            }
+        }
+
+        // If no edge was found then the edge is a yet-to-be-created back edge
+        $this->data[$source][] = ['v' => $destination, 'capacity' => 0, 'flow' => $bottleneckFlow];
+    }
+
 }
 
 class Disjoint_Set
@@ -647,29 +987,5 @@ class Disjoint_Set
         }
         $this->parent[$element1Rep] = ($element1RepRank > $element2RepRank) ? $element2Rep : $element1Rep;
         $this->parent[$element2Rep] = ($element2RepRank > $element1RepRank) ? $element1Rep : $element2Rep;
-    }
-}
-
-// Helping functions 
-
-function kosaraju_dfs1($graph, $vertex, &$stack, &$visited_vertices)
-{
-    if (isset($visited_vertices[$vertex])) return;
-    $visited_vertices[$vertex] = true;
-    foreach($graph[$vertex] as $neighbor)
-    {
-        kosaraju_dfs1($graph, $neighbor, $stack, $visited_vertices);
-    }
-    $stack[] = $vertex;
-}
-
-function kosaraju_dfs2($transpose_graph, $vertex, &$Second_dfs_recursion_stack, &$visited_vertices)
-{
-    if (isset($visited_vertices[$vertex])) return;
-    $visited_vertices[$vertex] = true;
-    $Second_dfs_recursion_stack[] = $vertex;
-    foreach($transpose_graph[$vertex] as $neighbor)
-    {
-        kosaraju_dfs2($transpose_graph, $neighbor, $Second_dfs_recursion_stack, $visited_vertices);
     }
 }

@@ -261,32 +261,7 @@ final class graphTest extends TestCase
         $this->assertEquals($expected_output_using_DFS, $this->adjacencyList->topological_sort());
         $this->assertEquals($expected_output_from_kahn, $this->adjacencyList->kahn());
     }
-
-    public function test_finding_articulation_points()
-    {
-        $this->adjacencyList->addVertices([1, 2, 3, 4, 5]);
-        $this->adjacencyList->setEdges([[1, 2], [1, 3], [2, 3], [3, 4], [4, 5]]);
-        $this->assertEquals([3, 4], $this->adjacencyList->find_articulation_points());
-    }
     
-    public function test_finding_bridges()
-    {
-        $this->adjacencyList->addVertices([0, 1, 2, 3]);
-        $this->adjacencyList->setEdges([[0, 1], [1, 2], [2, 3]]);
-        $this->assertEquals([[0, 1], [1, 2], [2, 3]], $this->adjacencyList->find_bridges());
-        $this->adjacencyList->clearEdges();
-        $this->adjacencyList->addVertex(4);
-        $this->adjacencyList->setEdges([[0, 1], [0, 2], [0, 3], [3, 4], [1, 2]]);
-        $this->assertEquals([[0, 3], [3, 4]], $this->adjacencyList->find_bridges());
-    }
-
-    public function test_finding_connected_components()
-    {
-        $this->adjacencyList->addVertices([0, 1, 2, 3, 4]);
-        $this->adjacencyList->setEdges([[0, 1], [1, 2], [3, 4]]);
-        $this->assertEquals([[0, 1, 2], [3, 4]], $this->adjacencyList->find_connected_components());
-    }
-
     #[DataProviderExternal('graphTestDataProviders', 'test_finding_SCCs_data_provider')]
     public function test_finding_SCCs($vertices, $edges, $expected_output_from_kosaraju, $expected_output_from_tarjan)
     {
@@ -294,6 +269,42 @@ final class graphTest extends TestCase
         $this->adjacencyList->setEdges($edges, true);
         $this->assertEquals($expected_output_from_kosaraju, $this->adjacencyList->find_SCCs_kosaraju());
         $this->assertEquals($expected_output_from_tarjan, $this->adjacencyList->find_SCCs_tarjan());
+    }
+
+    public function test_finding_articulation_points()
+    {
+        $this->adjacencyList->addVertices([1, 2, 3, 4, 5]);
+        $this->adjacencyList->setEdges([[1, 2], [1, 3], [2, 3], [3, 4], [4, 5]]);
+        $this->assertEquals([3, 4], $this->adjacencyList->find_articulation_points_using_naive_approach());
+        $this->assertEquals([4, 3], $this->adjacencyList->find_articulation_points_using_tarjan_algorithm());
+    }
+    
+    public function test_finding_bridges()
+    {
+        $this->adjacencyList->addVertices([0, 1, 2, 3]);
+        $this->adjacencyList->setEdges([[0, 1], [1, 2], [2, 3]]);
+        $this->assertEquals([[0, 1], [1, 2], [2, 3]], $this->adjacencyList->find_bridges_using_naive_approach());
+        $this->assertEquals([[2, 3], [1, 2], [0, 1]], $this->adjacencyList->find_bridges_using_tarjan_algorithm());
+        $this->adjacencyList->clearEdges();
+        $this->adjacencyList->addVertex(4);
+        $this->adjacencyList->setEdges([[0, 1], [0, 2], [0, 3], [3, 4], [1, 2]]);
+        $this->assertEquals([[0, 3], [3, 4]], $this->adjacencyList->find_bridges_using_naive_approach());
+        $this->assertEquals([[3, 4], [0, 3]], $this->adjacencyList->find_bridges_using_tarjan_algorithm());
+    }
+
+    #[DataProviderExternal('graphTestDataProviders', 'test_finding_biconnected_connected_components_data_provider')]
+    public function test_finding_biconnected_connected_components($vertices, $edges, $expected_output)
+    {
+        $this->adjacencyList->addVertices($vertices);
+        $this->adjacencyList->setEdges($edges);
+        $this->assertEquals($expected_output, $this->adjacencyList->find_biconnected_components());
+    }
+
+    public function test_finding_connected_components()
+    {
+        $this->adjacencyList->addVertices([0, 1, 2, 3, 4]);
+        $this->adjacencyList->setEdges([[0, 1], [1, 2], [3, 4]]);
+        $this->assertEquals([[0, 1, 2], [3, 4]], $this->adjacencyList->find_connected_components());
     }
 
     public function test_checking_whether_the_graph_is_bi_connected_or_not()
@@ -307,6 +318,29 @@ final class graphTest extends TestCase
         $this->adjacencyList->addVertices([1, 2]);
         $this->adjacencyList->setEdges([[1, 2]]);
         $this->assertTrue($this->adjacencyList->bi_connected());
+    }
+    
+    #[DataProviderExternal('graphTestDataProviders', 'test_finding_graph_type_eulerian_semi_eulerian_not_eulerian_data_provider')]
+    public function test_finding_graph_type_eulerian_semi_eulerian_not_eulerian($vertices, $edges, $expected_graph_type)
+    {
+        $this->adjacencyList->addVertices($vertices);
+        $this->adjacencyList->setEdges($edges);
+        $this->assertEquals($expected_graph_type, $this->adjacencyList->isEulerian());
+    }
+
+    public function test_fleury_algorithm_for_finding_eulerian_paths()
+    {
+        $this->adjacencyList->addVertices([0, 1, 2, 3, 4]);
+        $this->adjacencyList->setEdges([[0, 1], [0, 2], [0, 3], [1, 2], [3, 4]]);
+        $this->assertEquals([0, 1, 2, 0, 3, 4], $this->adjacencyList->find_eulerian_path_fleury_algorithm());
+    }
+    
+    #[DataProviderExternal('graphTestDataProviders', 'test_calculating_the_maximum_flow_data_provider')]
+    public function test_calculating_the_maximum_flow($vertices, $edges, $source, $sink, $expected_maximum_flow)
+    {
+        $this->adjacencyList->addVertices($vertices);
+        $this->adjacencyList->setFlowEdges($edges);
+        $this->assertEquals($expected_maximum_flow, $this->adjacencyList->ford_fulkerson($source, $sink));
     }
 }
 
@@ -500,5 +534,48 @@ class graphTestDataProviders
             [["a", "b", "c", "d", "e"], [["a", "c"], ["c", "b"], ["b", "a"], ["c", "d"], ["d", "e"]], 
              [["a", "b", "c"], ["d"], ["e"]], [["e"], ["d"], ["b", "c", "a"]]]
         ];
+    }
+
+    public static function test_finding_biconnected_connected_components_data_provider()
+    {
+        return [
+            // Order of input  1:Graph vertices  2: Graph edges   3: Expected output
+            [[1, 0], [[0, 1]], [[1, 0]]],
+
+            [[4, 3, 2, 1], [[4, 2], [4, 3], [2, 3], [3, 1]], [[3, 1], [3, 4, 2]]],
+            
+            [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 
+            [[10, 11], [0, 1],[1, 2], [1, 3], [2, 3], [2, 4], [3, 4], [0, 6], [1, 5], [6, 5], [5, 7], [5, 8], [7, 8], [8, 9]],
+            [[4, 2, 3, 1], [8, 9], [8 , 5, 7], [6, 0, 5, 1], [10, 11]]],
+        ];
+    }
+
+    public static function test_finding_graph_type_eulerian_semi_eulerian_not_eulerian_data_provider()
+    {
+        return 
+        [
+            // Order of input   1:Graph vertices   2:Graph edges   3:Graph type   4:possible eulerian path  5:Another possible eulerian path
+            // The last two inputs are only in case the graph has eulerian paths
+            [[0, 1, 2, 3, 4], [[0, 1], [0, 2], [0, 3], [1, 2], [3, 4]], "Semi-eulerian", [4, 3, 0, 1, 2, 0], [0, 1, 2, 0, 3, 4]],
+            [[0, 1, 2, 3, 4], [[0, 1], [0, 2], [0, 3], [0, 4], [1, 2], [3, 4]], "Eulerian", [], []],
+            [[0, 1, 2, 3, 4], [[0, 1], [0, 2], [0, 3], [1, 2], [3, 4], [3, 1]], "Not eulerian", [], []],
+
+            // Not an eulerian graph because not all non-degree vertices are connected
+            [[0, 1, 2, 3, 4, 5], [[0, 1], [0, 2], [0, 3], [1, 2], [4, 5]], "Not eulerian", [], []],
+        ];
+    }
+
+    public static function test_calculating_the_maximum_flow_data_provider()
+    {
+        // Order of input   1:Graph vertices   2:Graph edges   3:Source   4:Sink    5:Expected maximum flows
+        return [
+            [[0, 1, 2, 3, 4, 5], [[0, 1, 16], [0, 2, 13], [1, 2, 10], [2, 1, 4], [1, 3, 12], [2, 4, 14], [3, 2, 9], [4, 3, 7], [4, 5, 4], [3, 5, 20]
+            ], 0, 5, 23],
+
+            [['s', 'a', 'c', 'd', 'b', 't'], 
+            [['s', 'a', 10], ['s', 'c', 10], ['a', 'c', 2], ['a', 'd', 8], ['a', 'b', 4], ['c', 'd', 9], ['d', 'b', 6], ['d', 't', 10], ['b', 't', 10]]
+             , 's', 't', 19],
+
+        ];       
     }
 }

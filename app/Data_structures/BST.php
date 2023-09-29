@@ -202,10 +202,7 @@ class BST
 
     public function breadth_first_traversal($node)
     {
-      if ($node === null)
-      {
-        return false;
-      }
+      if ($node === null) return false;
       
       $queue = [$node];
 

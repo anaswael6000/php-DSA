@@ -2,8 +2,6 @@
 
 namespace app\Data_structures;
 
-include "app/Data_structures/linkedList.php";
-
 class queue
 {
     private $front = NULL;

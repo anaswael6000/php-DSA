@@ -2,8 +2,6 @@
 
 namespace app\Data_structures;
 
-include "app/Data_structures/queue.php";
-
 class adjacencyMatrix
 {
     public $data = [];
@@ -258,15 +256,16 @@ class adjacencyList
 
     // Shortest path algorithms
 
-    public function dijkstra($starting_vertex)
+    public function dijkstra($source_vertex)
     {
         $shortest_distances = new priority_queue();
-        $shortest_distances->enqueue([0, $starting_vertex]);
+        $shortest_distances->enqueue([0, $source_vertex]);
         $visited_vertices = [];
+        $previous_vertex[$source_vertex] = $source_vertex;
 
         foreach($this->vertices as $vertex)
         {
-            if ($vertex === $starting_vertex) continue;
+            if ($vertex === $source_vertex) continue;
             $shortest_distances->enqueue([INF, $vertex]);
         }
 
@@ -288,13 +287,22 @@ class adjacencyList
                 if ($current_vertex['priority'] + $weight < $shortest_distances->data[$neighbor_index]['priority'])
                 {
                     $shortest_distances->updatePriority($neighbor_index, $current_vertex['priority'] + $weight);
+                    $previous_vertex[$neighbor] = $current_vertex['value'];
                 }
             }
             $visited_vertices[$current_vertex['value']] = true;
             $shortest_distances_array[$current_vertex['value']] = $current_vertex['priority'];
         }
 
-        return $shortest_distances_array;
+        // Reconstruct shortest paths
+        $shortest_paths = [];
+
+        foreach($this->vertices as $vertex)
+        {
+            $shortest_paths[$vertex] = $this->Reconstruct_path($vertex, $source_vertex, $previous_vertex);
+        }
+
+        return [$shortest_distances_array, $shortest_paths];
     }
 
     public function bellman_ford($starting_vertex)
@@ -320,6 +328,50 @@ class adjacencyList
             }
         }
         return $shortest_distances;
+    }
+
+    public function floyd_warshall()
+    {
+        $shortest_distances = array_fill_keys($this->vertices, array_fill_keys($this->vertices, INF));
+        foreach($this->vertices as $vertex)
+        {
+            $shortest_distances[$vertex][$vertex] = 0;
+        }
+
+        foreach($this->edges as [$source, $destination, $weight])
+        {
+            $shortest_distances[$source][$destination] = $weight;
+        }
+
+        foreach($this->vertices as $intermediate_point)
+        {
+            foreach($this->vertices as $source)
+            {
+                foreach($this->vertices as $destination)
+                {
+                    if ($shortest_distances[$source][$destination] > $shortest_distances[$source][$intermediate_point] + 
+                        $shortest_distances[$intermediate_point][$destination])
+                    {
+                        $shortest_distances[$source][$destination] = 
+                        $shortest_distances[$source][$intermediate_point] + $shortest_distances[$intermediate_point][$destination];
+                    }
+                }
+            }
+        }
+
+        return $shortest_distances;
+    }
+
+    public function Reconstruct_path($vertex, $source_vertex, $previous_vertex)
+    {
+        $path = [];
+        while($vertex !== $source_vertex)
+        {
+            $path[] = $vertex;
+            $vertex = $previous_vertex[$vertex];
+        }
+        $path[] = $source_vertex;
+        return array_reverse($path);
     }
 
     // Minimum spanning trees
@@ -877,33 +929,34 @@ class adjacencyList
 
     public function ford_fulkerson($source, $sink)
     {
-        $parent = [];
+        // An associate array containing all the previous vertices of any vertex along the path 
+        $previous_vertex = [];
         $max_flow = 0;
-        while($this->ford_fulkerson_bfs($source, $sink, $parent))
+        while($this->ford_fulkerson_bfs($source, $sink, $previous_vertex))
         {
             $bottleneckFlow = INF;
             $vertex = $sink;
             while($vertex != $source)
             {
-                $bottleneckFlow = min($bottleneckFlow, $this->getResidualCapacity($parent[$vertex], $vertex));
-                $vertex = $parent[$vertex];
+                $bottleneckFlow = min($bottleneckFlow, $this->getResidualCapacity($previous_vertex[$vertex], $vertex));
+                $vertex = $previous_vertex[$vertex];
             }
 
             $vertex = $sink;
             while($vertex !== $source)
             {
-                $this->updateResidualCapacity($parent[$vertex], $vertex, $bottleneckFlow);
-                $this->updateResidualCapacity($vertex, $parent[$vertex], -$bottleneckFlow);
-                $vertex = $parent[$vertex];
+                $this->updateResidualCapacity($previous_vertex[$vertex], $vertex, $bottleneckFlow);
+                $this->updateResidualCapacity($vertex, $previous_vertex[$vertex], -$bottleneckFlow);
+                $vertex = $previous_vertex[$vertex];
             }
 
             $max_flow += $bottleneckFlow;
-            $parent = [];
+            $previous_vertex = [];
         }
         return $max_flow;
     }
 
-    public function ford_fulkerson_bfs($source, $sink, &$parent)
+    public function ford_fulkerson_bfs($source, $sink, &$previous_vertex)
     {
         $visited_vertices = array_fill_keys($this->vertices, false);
         $queue = [$source];
@@ -917,7 +970,7 @@ class adjacencyList
             {
                 if ($visited_vertices[$destination] === false && $capacity - $flow > 0)
                 {
-                    $parent[$destination] = $source; 
+                    $previous_vertex[$destination] = $source; 
                     $queue[] = $destination;
                     $visited_vertices[$destination] = true;
                 }

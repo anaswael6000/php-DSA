@@ -214,12 +214,15 @@ final class graphTest extends TestCase
     }
 
     #[DataProviderExternal('graphTestDataProviders', 'test_dijkstra_algorithm_data_provider')]
-    public function test_dijkstra_algorithm($vertices, $edges, $directed, $starting_vertex, $expected_shortest_distances)
+    public function test_dijkstra_algorithm($vertices, $edges, $directed, $source_vertex, $expected_shortest_distances, $expected_shortest_paths)
     {
         $this->adjacencyList->addVertices($vertices);
         $this->adjacencyList->setWeightedEdges($edges, $directed);
-        // The used method compares the first dimension of the array by values only and the second dimension of the array by values and order
-        $this->assertEquals($expected_shortest_distances, $this->adjacencyList->dijkstra($starting_vertex));
+        $Algorithm_output = $this->adjacencyList->dijkstra($source_vertex);
+        $Actual_shortest_distances = $Algorithm_output[0];
+        $Actual_shortest_paths = $Algorithm_output[1];
+        $this->assertEquals($expected_shortest_distances, $Actual_shortest_distances);
+        $this->assertEquals($expected_shortest_paths, $Actual_shortest_paths);
     }
 
     #[DataProviderExternal('graphTestDataProviders', 'test_bellman_ford_algorithm_data_provider')]
@@ -229,6 +232,14 @@ final class graphTest extends TestCase
         $this->adjacencyList->setWeightedEdges($edges, $directed);
         // The used method compares the first dimension of the array by values only and the second dimension of the array by values and order
         $this->assertEquals($expected_shortest_distances, $this->adjacencyList->bellman_ford($starting_vertex));
+    }
+    
+    #[DataProviderExternal('graphTestDataProviders', 'test_floyd_warshall_algorithm_data_provider')]
+    public function test_floyd_warshall_algorithm($vertices, $edges, $expected_2DMatrix)
+    {
+        $this->adjacencyList->addVertices($vertices);
+        $this->adjacencyList->setWeightedEdges($edges, true);
+        $this->assertEquals($expected_2DMatrix, $this->adjacencyList->floyd_warshall());
     }
 
     #[DataProviderExternal('graphTestDataProviders', 'test_kruskal_algorithm_data_provider')]
@@ -335,13 +346,14 @@ final class graphTest extends TestCase
         $this->assertEquals([0, 1, 2, 0, 3, 4], $this->adjacencyList->find_eulerian_path_fleury_algorithm());
     }
     
-    #[DataProviderExternal('graphTestDataProviders', 'test_calculating_the_maximum_flow_data_provider')]
-    public function test_calculating_the_maximum_flow($vertices, $edges, $source, $sink, $expected_maximum_flow)
+    #[DataProviderExternal('graphTestDataProviders', 'test_ford_fulkerson_algorithm_data_provider')]
+    public function test_ford_fulkerson_algorithm($vertices, $edges, $source, $sink, $expected_maximum_flow)
     {
         $this->adjacencyList->addVertices($vertices);
         $this->adjacencyList->setFlowEdges($edges);
         $this->assertEquals($expected_maximum_flow, $this->adjacencyList->ford_fulkerson($source, $sink));
     }
+
 }
 
 class graphTestDataProviders
@@ -443,7 +455,8 @@ class graphTestDataProviders
     public static function test_dijkstra_algorithm_data_provider()
     {
         return [
-            // Order of input  1:Graph input  2:Edges  3:Whether the edges is directed or not  4:Starting vertex  5:Expected shortest distances
+            /* Order of input  1:Graph input  2:Edges  3:Whether the edges is directed or not  4:source vertex  5:Expected shortest distances 
+                               6:Expected shortest paths  */ 
             [
             // Graph input
             [0, 1, 2, 3, 4, 5, 6, 7, 8], 
@@ -455,10 +468,17 @@ class graphTestDataProviders
             // Starting vertex
             0, 
             // Expected shortest distances
-            [0 => 0, 1 => 4, 2 => 12, 3 => 19, 4 => 21, 5 => 11, 6 => 9, 7 => 8, 8 => 14]],
+            [0 => 0, 1 => 4, 2 => 12, 3 => 19, 4 => 21, 5 => 11, 6 => 9, 7 => 8, 8 => 14], 
+
+            // Expected shortest paths
+            [0 => [0], 1 => [0, 1], 2 => [0, 1, 2], 
+            3 => [0, 1, 2, 3], 4 => [0, 7, 6, 5, 4], 5 => [0, 7, 6, 5], 6 => [0, 7, 6], 7 => [0, 7], 8 => [0, 1, 2, 8]]],
+            
              
             [["A", "B", "C", "D", "E"], [["A", "B", 4], ["A", "C", 2], ["B", "C", 3], ["B", "D", 2], ["B", "E", 3],
-             ["C", "D", 4], ["C", "B", 1], ["C", "E", 5], ["E", "D", 1]], true, "A", ["A" => 0, "C" => 2, "B" => 3, "D" => 5, "E" => 6]],
+             ["C", "D", 4], ["C", "B", 1], ["C", "E", 5], ["E", "D", 1]], true, "A", ["A" => 0, "C" => 2, "B" => 3, "D" => 5, "E" => 6]
+             , ["A" => ["A"], "C" => ["A", "C"], "B" => ["A", "C", "B"], "E" => ["A", "C", "B", "E"], "D" => ["A", "C", "B", "D"]]],
+
             ];
     }
 
@@ -478,6 +498,16 @@ class graphTestDataProviders
             // Additional test for graphs with negative weight edges
             [["S", "E", "D", "C", "B", "A"], [["S", "E", 8], ["S", "A", 10], ["E", "D", 1], ["A", "C", 2],
              ["D", "C", -1], ["D", "A", -4], ["C", "B", -2], ["B", "A", 1]] , true, "S", ["S" => 0, "A" => 5, "B" => 5, "C" => 7, "D" => 9, "E" => 8]],  
+        ];
+    }
+
+    public static function test_floyd_warshall_algorithm_data_provider()
+    {
+        // Order of input   1:Graph vertices   2:Graph edges   3:Expected shortest distances 2D matrix
+        return [
+            [[1, 2, 3, 4], [[1, 3, -2], [2, 1, 4], [2, 3, 3], [3, 4, 2], [4, 2, -1]], [1 => [1 => 0, 2 => -1, 3 => -2, 4 => 0], 
+            2 => [1 => 4, 2 => 0, 3 => 2, 4 => 4], 3 => [1 => 5, 2 => 1, 3 => 0, 4 => 2], 4 => [1 => 3, 2 => -1, 3 => 1, 4 => 0]]],
+
         ];
     }
 
@@ -565,7 +595,7 @@ class graphTestDataProviders
         ];
     }
 
-    public static function test_calculating_the_maximum_flow_data_provider()
+    public static function test_ford_fulkerson_algorithm_data_provider()
     {
         // Order of input   1:Graph vertices   2:Graph edges   3:Source   4:Sink    5:Expected maximum flows
         return [
